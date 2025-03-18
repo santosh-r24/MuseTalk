@@ -218,72 +218,146 @@ class Avatar:
                 cv2.imwrite(f"{self.avatar_path}/tmp/{str(self.idx).zfill(8)}.png",combine_frame)
             self.idx = self.idx + 1
 
+    def process_audio_frame(audio_chunk, fps):
+        """
+        Process an incoming audio chunk instead of waiting for a full file.
+        """
+        audio_feature = audio_processor.audio2feat(audio_chunk)  # Process incoming chunk
+        return audio_processor.feature2chunks(feature_array=audio_feature, fps=fps)  # Convert to MuseTalk format
+
+    def get_next_latent(self):
+        """
+        Fetches the next precomputed latent vector for the current frame.
+        """
+        if self.idx < len(self.input_latent_list_cycle):
+            latent = self.input_latent_list_cycle[self.idx]
+            self.idx += 1  # Move to the next frame
+            return latent.to(dtype=unet.model.dtype)  # Ensure correct data type
+        else:
+            return None  # Stop when all frames are processed
+
     def inference(self, 
-                  audio_path, 
+                  get_next_audio_chunk, 
                   out_vid_name, 
                   fps,
                   skip_save_images):
         os.makedirs(self.avatar_path+'/tmp',exist_ok =True)   
-        print("start inference")
-        ############################################## extract audio feature ##############################################
-        start_time = time.time()
-        whisper_feature = audio_processor.audio2feat(audio_path)
-        whisper_chunks = audio_processor.feature2chunks(feature_array=whisper_feature,fps=fps)
-        print(f"processing audio:{audio_path} costs {(time.time() - start_time) * 1000}ms")
-        ############################################## inference batch by batch ##############################################
-        video_num = len(whisper_chunks)   
+        print("🚀 Starting Streaming Inference with MuseTalk...")
+
         res_frame_queue = queue.Queue()
-        self.idx = 0
-        # # Create a sub-thread and start it
+        self.idx = 0 
+        
+        video_num = len(self.input_latent_list_cycle)  # Total frames available
+        # Create a sub-thread and start it
         process_thread = threading.Thread(target=self.process_frames, args=(res_frame_queue, video_num, skip_save_images))
         process_thread.start()
-
-        gen = datagen(whisper_chunks,
-                      self.input_latent_list_cycle, 
-                      self.batch_size)
+        ############################################## extract audio feature ##############################################
         start_time = time.time()
-        res_frame_list = []
-        
-        for i, (whisper_batch,latent_batch) in enumerate(tqdm(gen,total=int(np.ceil(float(video_num)/self.batch_size)))):
-            audio_feature_batch = torch.from_numpy(whisper_batch)
-            audio_feature_batch = audio_feature_batch.to(device=unet.device,
-                                                         dtype=unet.model.dtype)
-            audio_feature_batch = pe(audio_feature_batch)
-            latent_batch = latent_batch.to(dtype=unet.model.dtype)
 
-            pred_latents = unet.model(latent_batch, 
-                                      timesteps, 
-                                      encoder_hidden_states=audio_feature_batch).sample
+        while True:
+            audio_chunk = get_next_audio_chunk()
+            
+            if audio_chunk is None:
+                break
+
+            processed_feature = self.process_audio_frame(audio_chunk, fps)
+            latent_batch = self.get_next_latent()
+
+            # 🎥 Run MuseTalk inference on the new frame
+            pred_latents = unet.model(latent_batch, timesteps, encoder_hidden_states=processed_feature).sample
             recon = vae.decode_latents(pred_latents)
-            for res_frame in recon:
-                res_frame_queue.put(res_frame)
-        # Close the queue and sub-thread after all tasks are completed
+
+            # 🖼️ Send generated video frame to Pipecat (for display)
+            res_frame_queue.put(recon)
+
         process_thread.join()
         
-        if args.skip_save_images is True:
-            print('Total process time of {} frames without saving images = {}s'.format(
-                        video_num,
-                        time.time()-start_time))
+        if skip_save_images:
+            print(f"✅ Processed {self.idx} frames without saving images in {time.time()-start_time:.2f}s")
         else:
-            print('Total process time of {} frames including saving images = {}s'.format(
-                        video_num,
-                        time.time()-start_time))
-
-        if out_vid_name is not None and args.skip_save_images is False: 
-            # optional
+            print(f"✅ Processed {self.idx} frames & saved images in {time.time()-start_time:.2f}s")
+        
+        # Convert generated frames into a video
+        if out_vid_name and not skip_save_images:
             cmd_img2video = f"ffmpeg -y -v warning -r {fps} -f image2 -i {self.avatar_path}/tmp/%08d.png -vcodec libx264 -vf format=rgb24,scale=out_color_matrix=bt709,format=yuv420p -crf 18 {self.avatar_path}/temp.mp4"
             print(cmd_img2video)
             os.system(cmd_img2video)
 
-            output_vid = os.path.join(self.video_out_path, out_vid_name+".mp4") # on
+            output_vid = os.path.join(self.video_out_path, out_vid_name + ".mp4")
             cmd_combine_audio = f"ffmpeg -y -v warning -i {audio_path} -i {self.avatar_path}/temp.mp4 {output_vid}"
             print(cmd_combine_audio)
             os.system(cmd_combine_audio)
 
             os.remove(f"{self.avatar_path}/temp.mp4")
             shutil.rmtree(f"{self.avatar_path}/tmp")
-            print(f"result is save to {output_vid}")
-        print("\n")
+            print(f"🎬 Final video saved at {output_vid}")
+
+    # def inference(self, 
+    #               audio_path, 
+    #               out_vid_name, 
+    #               fps,
+    #               skip_save_images):
+    #     os.makedirs(self.avatar_path+'/tmp',exist_ok =True)   
+    #     print("start inference")
+    #     ############################################## extract audio feature ##############################################
+    #     start_time = time.time()
+    #     whisper_feature = audio_processor.audio2feat(audio_path)
+    #     whisper_chunks = audio_processor.feature2chunks(feature_array=whisper_feature,fps=fps)
+    #     print(f"processing audio:{audio_path} costs {(time.time() - start_time) * 1000}ms")
+    #     ############################################## inference batch by batch ##############################################
+    #     video_num = len(whisper_chunks)   
+    #     res_frame_queue = queue.Queue()
+    #     self.idx = 0
+    #     # # Create a sub-thread and start it
+    #     process_thread = threading.Thread(target=self.process_frames, args=(res_frame_queue, video_num, skip_save_images))
+    #     process_thread.start()
+
+    #     gen = datagen(whisper_chunks,
+    #                   self.input_latent_list_cycle, 
+    #                   self.batch_size)
+    #     start_time = time.time()
+    #     res_frame_list = []
+        
+    #     for i, (whisper_batch,latent_batch) in enumerate(tqdm(gen,total=int(np.ceil(float(video_num)/self.batch_size)))):
+    #         audio_feature_batch = torch.from_numpy(whisper_batch)
+    #         audio_feature_batch = audio_feature_batch.to(device=unet.device,
+    #                                                      dtype=unet.model.dtype)
+    #         audio_feature_batch = pe(audio_feature_batch)
+    #         latent_batch = latent_batch.to(dtype=unet.model.dtype)
+
+    #         pred_latents = unet.model(latent_batch, 
+    #                                   timesteps, 
+    #                                   encoder_hidden_states=audio_feature_batch).sample
+    #         recon = vae.decode_latents(pred_latents)
+    #         for res_frame in recon:
+    #             res_frame_queue.put(res_frame)
+    #     # Close the queue and sub-thread after all tasks are completed
+    #     process_thread.join()
+        
+    #     if args.skip_save_images is True:
+    #         print('Total process time of {} frames without saving images = {}s'.format(
+    #                     video_num,
+    #                     time.time()-start_time))
+    #     else:
+    #         print('Total process time of {} frames including saving images = {}s'.format(
+    #                     video_num,
+    #                     time.time()-start_time))
+
+    #     if out_vid_name is not None and args.skip_save_images is False: 
+    #         # optional
+    #         cmd_img2video = f"ffmpeg -y -v warning -r {fps} -f image2 -i {self.avatar_path}/tmp/%08d.png -vcodec libx264 -vf format=rgb24,scale=out_color_matrix=bt709,format=yuv420p -crf 18 {self.avatar_path}/temp.mp4"
+    #         print(cmd_img2video)
+    #         os.system(cmd_img2video)
+
+    #         output_vid = os.path.join(self.video_out_path, out_vid_name+".mp4") # on
+    #         cmd_combine_audio = f"ffmpeg -y -v warning -i {audio_path} -i {self.avatar_path}/temp.mp4 {output_vid}"
+    #         print(cmd_combine_audio)
+    #         os.system(cmd_combine_audio)
+
+    #         os.remove(f"{self.avatar_path}/temp.mp4")
+    #         shutil.rmtree(f"{self.avatar_path}/tmp")
+    #         print(f"result is save to {output_vid}")
+    #     print("\n")
        
 
 if __name__ == "__main__":
