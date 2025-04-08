@@ -4,7 +4,12 @@
 .vscode/
 *.pyc
 .ipynb_checkpoints
-models
 results/
-data/audio/*.wav
-data/video/*.mp4
+./models
+**/__pycache__/
+*.py[cod]
+*$py.class
+dataset/
+ffmpeg*
+debug
+exp_out
