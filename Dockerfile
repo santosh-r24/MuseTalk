@@ -10,7 +10,7 @@ RUN pip install --upgrade pip
 RUN pip install torch==2.0.0 torchvision==0.15.1 --index-url https://download.pytorch.org/whl/cu118
 
 # Copy your requirements.txt and install
-COPY /workspace/requirements.txt /requirements.txt
+COPY requirements.txt /requirements.txt
 RUN pip install -r /requirements.txt
 
 # Install mmlab/openmim libs
