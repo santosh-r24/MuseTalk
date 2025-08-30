@@ -16,20 +16,22 @@ elif ffmpeg_path not in os.getenv('PATH'):
     os.environ["PATH"] = f"{ffmpeg_path}:{os.environ['PATH']}"
 
     
-from musetalk.models.vae import VAE
-from musetalk.models.unet import UNet,PositionalEncoding
+# from musetalk.models.vae import VAE
+# from musetalk.models.unet import UNet,PositionalEncoding
+from MuseTalk.musetalk.models.vae import VAE
+from MuseTalk.musetalk.models.unet import UNet, PositionalEncoding
 
-MODEL_DIR = "/content/drive/MyDrive/VegetaAvatar/MuseTalk"
+MODEL_DIR = "/workspace/MuseTalk/models"
 
 
 def load_all_model(
-    unet_model_path=f"{MODEL_DIR}/models/musetalk/pytorch_model.bin",
+    unet_model_path=f"{MODEL_DIR}/musetalk_v15/unet.pth",
     vae_type="sd-vae-ft-mse",
-    unet_config=f"{MODEL_DIR}/models/musetalk/musetalk.json",
+    unet_config=f"{MODEL_DIR}/musetalk_v15/musetalk.json",
     device=None,
 ):
     vae = VAE(
-        model_path = f"{MODEL_DIR}/models/{vae_type}/",
+        model_path = f"{MODEL_DIR}/{vae_type}/",
     )
     print(f"load unet model from {unet_model_path}")
     unet = UNet(

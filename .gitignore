@@ -8,6 +8,7 @@ results/
 models/*
 vegeta/*
 audio/*
+base_video/*
 **/__pycache__/
 *.py[cod]
 *$py.class

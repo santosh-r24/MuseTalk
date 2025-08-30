@@ -9,7 +9,7 @@ from transformers import AutoFeatureExtractor
 
 
 class AudioProcessor:
-    def __init__(self, feature_extractor_path="openai/whisper-tiny/"):
+    def __init__(self, feature_extractor_path="/workspace/MuseTalk/models/whisper/"):
         self.feature_extractor = AutoFeatureExtractor.from_pretrained(feature_extractor_path)
 
     def get_audio_feature(self, wav_path, start_index=0, weight_dtype=None):
@@ -49,7 +49,9 @@ class AudioProcessor:
         whisper_feature = []
         # Process multiple 30s mel input features
         for input_feature in whisper_input_features:
-            audio_feats = whisper.encoder(input_feature.to(device), output_hidden_states=True).hidden_states
+            input_feature = input_feature.to(device=device, dtype=weight_dtype)
+            audio_feats = whisper.encoder(input_feature, output_hidden_states=True).hidden_states
+            # audio_feats = whisper.encoder(input_feature.to(device), output_hidden_states=True).hidden_states
             audio_feats = torch.stack(audio_feats, dim=2).to(weight_dtype)
             whisper_feature.append(audio_feats)
 

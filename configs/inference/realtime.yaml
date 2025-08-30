@@ -1,10 +1,10 @@
 avator_1:
  preparation: True # your can set it to False if you want to use the existing avator, it will save time
  bbox_shift: 5
- video_path: "data/video/yongen.mp4"
+ video_path: "/workspace/MuseTalk/base_video/vegeta_video.mp4"
  audio_clips:
-     audio_0: "data/audio/yongen.wav"
-     audio_1: "data/audio/eng.wav"
+     audio_0: "/workspace/MuseTalk/audio/output_59cd5be62c9f40129876770867c0ee8b.wav"
+    #  audio_1: "data/audio/eng.wav"
  
   
 
