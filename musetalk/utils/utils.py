@@ -21,7 +21,7 @@ elif ffmpeg_path not in os.getenv('PATH'):
 from MuseTalk.musetalk.models.vae import VAE
 from MuseTalk.musetalk.models.unet import UNet, PositionalEncoding
 
-MODEL_DIR = "/workspace/MuseTalk/models"
+MODEL_DIR = "/runpod-volume/MuseTalk/models"
 
 
 def load_all_model(
