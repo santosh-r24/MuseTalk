@@ -9,7 +9,7 @@ from transformers import AutoFeatureExtractor
 
 
 class AudioProcessor:
-    def __init__(self, feature_extractor_path="/workspace/MuseTalk/models/whisper/"):
+    def __init__(self, feature_extractor_path="/runpod-volume/MuseTalk/models/whisper/"):
         self.feature_extractor = AutoFeatureExtractor.from_pretrained(feature_extractor_path)
 
     def get_audio_feature(self, wav_path, start_index=0, weight_dtype=None):
